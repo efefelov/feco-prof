@@ -54,6 +54,30 @@ textarea:focus{outline:1px solid var(--accent)}
 .syn-row input{accent-color:var(--accent);width:15px;height:15px}
 .syn-row.gold{border-color:var(--yellow);background:rgba(240,180,41,.08)}
 .syn-row.green{border-color:var(--green)}
+/* визуалы */
+svg.chart{width:100%;height:auto;display:block}
+svg.chart text{font-family:inherit}
+.locked-box{position:relative;filter:blur(6px);pointer-events:none;user-select:none}
+.locked-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;background:rgba(15,17,23,.55);border:1px solid var(--border);border-radius:12px;padding:16px}
+.code-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.code-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.pay-note{font-size:13px;color:var(--muted)}
+/* печать: светлый лист, чёрный текст */
+@media print{
+  body{background:#fff !important;color:#111 !important}
+  .wrap{max-width:none;padding:0}
+  header{padding:8px 0}
+  .card{background:#fff !important;border:1px solid #ccc !important;break-inside:avoid;box-shadow:none}
+  .tab,.tabs,.act,.locked-overlay,.no-print{display:none !important}
+  .view{display:block !important}
+  .view:not(#view-report){display:none !important}
+  b,h1,h2,h3,h4{color:#000 !important}
+  .muted,.hint{color:#444 !important}
+  .callout,.q-item,.dir-card,.syn-row,.ik-circle,.bar-track{background:#f4f4f4 !important}
+  .tag{background:#eee !important;color:#333 !important}
+  svg.chart text,.bar-fill{fill:#333 !important}
+  .bar-fill{background:#666 !important}
+}
 .view{display:none}
 .view.active{display:block}
 .big{font-size:26px;font-weight:600;margin:10px 0}
@@ -68,7 +92,11 @@ textarea:focus{outline:1px solid var(--accent)}
 
 <div class="view active" id="view-start">
   <div class="card">
-    <h3>Как читать результаты — прочитайте до вопросов</h3>
+    <h3>Как это работает — 3 шага</h3>
+    <div class="bar-row"><div class="lbl"><b>1.</b> Профпроба</div><div class="muted">30 вопросов, 12 минут → карта склонностей и гипотезы направлений</div></div>
+    <div class="bar-row"><div class="lbl"><b>2.</b> План проверки</div><div class="muted">конкретные пробы руками — решение не принимается по тесту</div></div>
+    <div class="bar-row"><div class="lbl"><b>3.</b> Икигай-лист</div><div class="muted">4 круга (люблю / умею / миру нужно / платят) → единый PDF-отчёт</div></div>
+    <h3 style="margin-top:14px">Как читать результаты — прочитайте до вопросов</h3>
     <div class="callout warn"><b>Главное правило:</b> Профпроба показывает <b>склонности</b> — то, что вам может нравиться и получаться. Она <b>не решает</b>, кем вы будете, и не отменяет ваш выбор. Правильный профессионал — это не результат теста, а решение, проверенное опытом.</div>
     <ul>
       <li>Результат — <b>гипотезы направлений</b> (3–6), а не «профессия-вердикт»;</li>
@@ -85,6 +113,11 @@ textarea:focus{outline:1px solid var(--accent)}
     <div style="margin-top:14px"><button class="act" onclick="startQuiz()">Начать →</button></div>
     <div class="muted" style="margin-top:10px">Вопросы об интересах и предпочтениях — нет «правильных» ответов. Отвечайте честно, как вам на самом деле нравится.</div>
   </div>
+  <div class="card">
+    <h3>🔬 Научная база — честно</h3>
+    <div class="muted">Текущая основа — открытая типология Голланда (RIASEC) и икигай-рамка (4 круга, западная адаптация Уинна, 2001). Это инструменты про интересах и склонностях: они НЕ измеряют способности, характер и «пригодность».</div>
+    <div class="callout" style="margin-top:10px"><b>Про методику МГУ — прямо:</b> методики МГУ-экосистемы (Центр «Гуманитарные технологии», создан на базе факультета психологии МГУ) — лицензионные. Мы не копируем их: подключение методик такого уровня — через партнёра-психолога с сертификацией (например, «Школа профконсультанта»). Пока — открытые научные инструменты + живой консультант. Это часть нашей этики: в профориентации цена ошибки — судьба человека.</div>
+  </div>
 </div>
 
 <div class="view" id="view-quiz">
@@ -96,6 +129,7 @@ textarea:focus{outline:1px solid var(--accent)}
 
 <div class="view" id="view-result"></div>
 <div class="view" id="view-ikigai"></div>
+<div class="view" id="view-report"></div>
 </div>
 
 <script>
@@ -153,6 +187,72 @@ const QUESTIONS = [
  ['Мне нравится наводить порядок в документах и информации.','C']
 ];
 const OPTS = ['Нет','Отчасти','Да'];
+
+/* ====== ИНТЕРПРЕТАЦИЯ: сочетания типов и слепые зоны ====== */
+const COMBO = {
+ 'RI':'Технический исследователь: инженер-разработчик, аналитика систем, ДВС/энергетика, IT-инфраструктура. Думает руками и цифрами одновременно.',
+ 'RA':'Изобретатель-творец: промышленный дизайн, прототипы, архитектурные решения, технические визуализации.',
+ 'RS':'Наставник-практик: производственное обучение, тренерство по техническим дисциплинам, наставничество в мастерских.',
+ 'RE':'Технический предприниматель: производственный бизнес, техносервис с командой, дистрибуция оборудования.',
+ 'RC':'Инженер-организатор: эксплуатация и обслуживание техники, надёжность, метрология, качество производства.',
+ 'IA':'Учёный-концептуалист: научная визуализация, научпоп, game-исследования, проектирование систем.',
+ 'IS':'Исследователь-коммуникатор: медицина, биотех, научная консультация, преподавание точных наук.',
+ 'IE':'Инноватор-предприниматель: техно-стартапы, R&D-продукты, венчурный анализ.',
+ 'IC':'Аналитик-структурист: data science, финансовая аналитика, аудиторская аналитика, исследовательская отчётность.',
+ 'AS':'Творец-коммуникатор: педагог искусств, арт-терапия, медиа для людей, сценаристы документалистики.',
+ 'AE':'Креативный лидер: креативный директор, продюсер, арт-предпринимательство, персональные медиа.',
+ 'AC':'Творец-организатор: издательское дело, продакшн, оформление и вёрстка на потоке, дизайн-системы.',
+ 'SE':'Люди-лидер: HR-лидер, тренер топ-команд, общественный лидер, организатор комьюнити.',
+ 'SC':'Помощник-организатор: управление персоналом, координатор сервисов, социальные проекты с бюджетом.',
+ 'EC':'Предприниматель-операционалист: масштабирование бизнеса, франшизы, операционный директор, закупки-продажи на потоке.'
+};
+const LOW_TXT = {
+ R:'Практико-технический низкий — не значит «не умеете руками»: значит, работа с техникой сама по себе вас не заряжает. Как основная профессия — риск быстрого выгорания; как навык внутри другой роли — полезен.',
+ I:'Исследовательский низкий — значит, длинные задачи «в стол» без практического выхода истощают. Это не «слабый ум», а иная мотивация: вам нужно видеть применение.',
+ A:'Артистический низкий — значит, «создавать с нуля» не ваш главный источник энергии; вы сильнее в работе с готовыми структурами, идеями и людьми.',
+ S:'Социальный низкий — значит, постоянная работа «на людей» истощает; вы продуктивнее в задачах с вещами, системами и идеями. Люди — эпизодически, не весь день.',
+ E:'Предпринимательский низкий — значит, конкурировать и «продавать себя» вам не в радость: ваша сила — экспертная глубина. Роль лидера — не обязательная часть успеха.',
+ C:'Конвенциональный низкий — значит, рутина и «по правилам» утомляют: аккуратность у вас есть там, где есть интерес. Место для дисциплины — короткие фазы, а не весь день.'
+};
+
+/* ====== SVG-ВИЗУАЛЫ ====== */
+function radarSVG(scores){
+  const keys=['R','I','A','S','E','C'], max=10, cx=160, cy=155, R=105;
+  const SHORT={R:'Практичный',I:'Исследователь',A:'Творческий',S:'Социальный',E:'Лидер',C:'Организатор'};
+  const ang=i=>-Math.PI/2 + i*Math.PI*2/6;
+  const pt=(i,r)=>`${cx+r*Math.cos(ang(i))},${cy+r*Math.sin(ang(i))}`;
+  let grid='';
+  for(let lv=1;lv<=4;lv++){grid+=`<polygon points="${keys.map((_,i)=>pt(i,R*lv/4)).join(' ')}" fill="none" stroke="#3a405a" stroke-width="1"/>`;}
+  const axes=keys.map((_,i)=>`<line x1="${cx}" y1="${cy}" x2="${pt(i,R)}" stroke="#3a405a" stroke-width="1"/>`).join('');
+  const poly=keys.map((k,i)=>pt(i,R*Math.max(scores[k],0.15)/max)).join(' ');
+  const labels=keys.map((k,i)=>{
+    const lx=cx+1.26*R*Math.cos(ang(i)), ly=cy+1.26*R*Math.sin(ang(i));
+    const anchor=lx<cx-8?'end':(lx>cx+8?'start':'middle');
+    return `<text x="${lx}" y="${ly}" fill="#c7cbdd" font-size="11" text-anchor="${anchor}" dominant-baseline="middle">${SHORT[k]} · ${scores[k]}</text>`;
+  }).join('');
+  return `<svg class="chart" viewBox="-70 -4 470 318" role="img" aria-label="Радар склонностей">
+    ${grid}${axes}
+    <polygon points="${poly}" fill="rgba(79,140,255,.25)" stroke="#4f8cff" stroke-width="2"/>
+    ${keys.map((k,i)=>{const[px,py]=pt(i,R*Math.max(scores[k],0.15)/max).split(',');return `<circle cx="${px}" cy="${py}" r="3.5" fill="#4f8cff"/>`;}).join('')}
+    ${labels}
+  </svg>`;
+}
+function vennSVG(gold, partial){
+  const circles=[
+    {x:150,y:120,r:62,label:'ЛЮБЛЮ',color:'#34c77b'},
+    {x:210,y:120,r:62,label:'УМЕЮ',color:'#4f8cff'},
+    {x:150,y:178,r:62,label:'НУЖНО МИРУ',color:'#8b5cf6'},
+    {x:210,y:178,r:62,label:'ПЛАТЯТ',color:'#f0864a'}
+  ];
+  const shapes=circles.map(c=>`<circle cx="${c.x}" cy="${c.y}" r="${c.r}" fill="${c.color}" fill-opacity=".18" stroke="${c.color}" stroke-width="1.5"/>`).join('');
+  const labels=circles.map(c=>`<text x="${c.x}" y="${c.y-2}" fill="#c7cbdd" font-size="10" text-anchor="middle">${c.label}</text>`).join('');
+  const center=gold.length
+    ? `<text x="180" y="150" fill="#f0b429" font-size="11" text-anchor="middle" font-weight="600">Икигай-кандидат:</text><text x="180" y="164" fill="#f0b429" font-size="10" text-anchor="middle">${gold[0].slice(0,28)}</text>`
+    : `<text x="180" y="150" fill="#9aa0b5" font-size="10" text-anchor="middle">Пересечение — цель.</text><text x="180" y="164" fill="#9aa0b5" font-size="10" text-anchor="middle">Подтверждайте круги.</text>`;
+  return `<svg class="chart" viewBox="0 0 360 300" role="img" aria-label="Четыре круга икигая">
+    ${shapes}${labels}${center}
+  </svg>`;
+}
 
 /* ====== СОСТОЯНИЕ ====== */
 let answers={}, qIdx=0;
@@ -252,11 +352,11 @@ window.showResult=function(){
   </div>
   <div class="card">
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="act" onclick="window.print()">Сохранить результат (печать/PDF)</button>
+      <button class="act" onclick="openReport()">📄 Единый отчёт (PDF)</button>
       <button class="act" onclick="openIkigai()">🧭 Икигай-лист: достроить 4 круга →</button>
       <button class="act sec" onclick="location.reload()">Пройти заново</button>
     </div>
-    <div class="muted" style="margin-top:10px">Результаты хранятся только в вашем браузере. «Профпроба» — бесплатный вход; глубокая диагностика — только с живым консультантом.</div>
+    <div class="muted" style="margin-top:10px">Единый отчёт собирает обе части — карту склонностей и Икигай-лист — в один документ с расшифровкой и диаграммами. Результаты хранятся только в вашем браузере. Глубокая диагностика — только с живым консультантом.</div>
   </div>`;
   window.scrollTo(0,0);
 };
@@ -376,6 +476,122 @@ window.calcSynth=function(){
   window.scrollTo(0,0);
 };
 window.ikFormulaSave=function(v){IK.formula=v;saveIK();};
+
+/* ====== ЕДИНЫЙ ОТЧЁТ (обе части) + ПЭЙВОЛ расширенной интерпретации ====== */
+let UNLOCKED=false;
+try{UNLOCKED=localStorage.getItem('prof-unlocked')==='1';}catch(e){}
+const PAY_LINK='#'; // ← сюда подставить ссылку на оплату (Продамус/Бусти/Т-Банк), v2
+const CODES=['PROF-490-DEMO','FECO-PROF-290'];
+window.payClick=function(){
+  const msg=document.getElementById('unlock-msg');
+  if(PAY_LINK==='#'){
+    if(msg)msg.innerHTML='<span style="color:var(--yellow)">Оплата подключается на следующем шаге. Для теста используйте код PROF-490-DEMO</span>';
+  }else{window.open(PAY_LINK,'_blank');}
+};
+window.unlockCheck=function(){
+  const c=(document.getElementById('unlock-code').value||'').trim().toUpperCase();
+  const msg=document.getElementById('unlock-msg');
+  if(CODES.includes(c)){
+    UNLOCKED=true;localStorage.setItem('prof-unlocked','1');
+    if(msg)msg.innerHTML='<span style="color:var(--green)">✓ Разблокировано — расширенная интерпретация добавлена в отчёт.</span>';
+    openReport();
+  }else if(msg){msg.innerHTML='<span style="color:var(--red)">✗ Код не подошёл. Проверьте написание или оплатите доступ.</span>';}
+};
+window.openReport=function(){
+  const scores=computeScores();
+  const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top=sorted.slice(0,3).filter(([k,v])=>v>=4);
+  const low=sorted[sorted.length-1];
+  const age=localStorage.getItem('prof-age')||'1011';
+  const ageName={'89':'8–9 класс','1011':'10–11 класс','adult':'студент/взрослый'}[age];
+  const comboKey=sorted.slice(0,2).map(([k])=>k).sort().join('');
+  const comboTxt=COMBO[comboKey]||'';
+  const gold=[],near=[];
+  IK.cands.forEach(c=>{
+    const n=(c.m||[]).filter(Boolean).length;
+    if(n===4)gold.push(c.name); else if(n===3)near.push(`${c.name} (не хватает: ${['любовь','умения','потребность мира','рынок/деньги'][(c.m||[]).findIndex(x=>!x)]})`);
+  });
+  const ikDone=IK.love.concat(IK.good,IK.world,IK.paid).some(t=>(t||'').trim().length>3);
+  const now=new Date().toLocaleDateString('ru-RU');
+
+  const interp=`
+  <div class="card"><h2>Расшифровка результатов</h2>
+    ${sorted.map(([k,v])=>`
+      <div class="dir-card">
+        <h4 style="color:${SCALES[k].color}">${SCALES[k].name} — ${v}/10 ${v>=8?'(выраженная)':v>=4?'(умеренная)':v>=2?'(слабая)':'(не выражена)'}</h4>
+        ${v>=4?`<div>${SCALES[k].desc}</div>`:`<div class="muted">${LOW_TXT[k]}</div>`}
+      </div>`).join('')}
+  </div>`;
+  const extInterp=`
+  <div class="card"><h2>Расширенная интерпретация</h2>
+    ${comboTxt?`<div class="callout green"><b>Ваше сочетание «${sorted[0][0]}+${sorted[1][0]}»:</b> ${comboTxt}</div>`:''}
+    <div class="callout"><b>Слепые зоны (ваш самый низкий тип — ${SCALES[low[0]].name.split(' (')[0]}):</b> ${LOW_TXT[low[0]]}
+    Практический вывод: в командах и парах ищите людей с этим типом сильным — они закроют то, что вам дорого по энергии, а вы им — своё.</div>
+    <div class="callout"><b>План на 12 месяцев (по возрасту: ${ageName}):</b>
+    <ol>${({
+      '89':['Месяц 1–2: проверить 2 гипотезы кружками/курсами','Месяц 3–4: профильные олимпиады и дни открытых дверей','Месяц 5–8: профильный класс или онлайн-школа по сильному типу','Месяц 9–12: перепройти Профпробу — интересы могли вырасти'],
+      '1011':['Месяц 1: 3 разговора с практиками гипотезных направлений','Месяц 2–3: вводные онлайн-курсы + пробные ЕГЭ-треки по предметам направления','Месяц 4–6: целевые вузы/колледжи, первый год обучения должен «радовать на слух»','Месяц 7–12: профпробы на реальных объектах (стажировки, экскурсии на производство)','Пересмотр карты перед подачей документов'],
+      'adult':['Месяц 1: инвентаризация опыта — что подтверждено деньгами/результатами','Месяц 2–3: малая платная проба каждого направления (не бросать работу)','Месяц 4–6: первые 3 клиента/заказа в новом направлении','Месяц 7–12: решение о масштабе — при выгорании сначала с ним работать, потом выбирать']
+    })[age].map(p=>`<li>${p}</li>`).join('')}</ol></div>
+  </div>`;
+
+  $('#view-result').classList.remove('active');
+  $('#view-ikigai').classList.remove('active');
+  $('#view-report').classList.add('active');
+  $('#view-report').innerHTML=`
+  <div class="card">
+    <h1 style="font-size:20px">📄 Единый отчёт «Профпроба + Икигай»</h1>
+    <div class="muted">${now} · аудитория: ${ageName} · основа: типология Голланда (RIASEC) + икигай-рамка</div>
+    <div class="muted">Результат — гипотезы направлений для проверки руками. Профессия — решение человека, подтверждённое опытом.</div>
+  </div>
+  <div class="card"><h2>1. Карта склонностей</h2>${radarSVG(scores)}
+    <div class="bar-wrap">${sorted.map(([k,v])=>`<div class="bar-row"><div class="lbl">${SCALES[k].name.split(' (')[0]}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/10*100)}%;background:${SCALES[k].color}"></div></div><div class="muted" style="width:40px;text-align:right">${v}/10</div></div>`).join('')}</div>
+  </div>
+  ${top.length?`<div class="card"><h2>2. Сильные склонности — гипотезы направлений</h2>
+    ${top.map(([k,v])=>`<div class="dir-card"><h4 style="color:${SCALES[k].color}">${SCALES[k].name} — ${v}/10</h4><div class="muted">${SCALES[k].desc}</div>${SCALES[k].dirs.map(d=>`<span class="tag">${d}</span>`).join('')}</div>`).join('')}
+  </div>`:`<div class="card"><h2>2. Ровные результаты</h2><div class="callout warn">Выраженных склонностей нет — интересы в поиске. Пройдите 3–4 разные пробы за месяц и перепройдите тест.</div></div>`}
+  <div class="card"><h2>3. Икигай-лист: четыре круга</h2>
+    ${ikDone?`
+      <div class="grid2">
+        <div>${['ЛЮБЛЮ: ','УМЕЮ: ','НУЖНО МИРУ: ','ПЛАТЯТ: '].map((lbl,gi)=>`<div class="ik-circle"><h4>${lbl}</h4>${[0,1,2].map(i=>{const arr=['love','good','world','paid'][gi];const t=(IK[arr][i]||'').trim();return t?`<div class="mini">• ${t}</div>`:'';}).join('')}</div>`).join('')}</div>
+        <div>${vennSVG(gold, near)}</div>
+      </div>
+      ${gold.length?`<div class="callout green"><b>Кандидаты икигая (4 круга подтверждены):</b> ${gold.map(g=>`«${g}»`).join(', ')}</div>`:''}
+      ${near.length?`<div class="callout"><b>Рядом с икигаем (3 круга):</b> ${near.join('; ')}</div>`:''}
+      ${IK.formula?`<div class="callout gold"><b>Формула икигая (гипотеза на 3–6 месяцев):</b> ${IK.formula}</div>`:''}
+    `:`<div class="callout warn">Икигай-лист ещё не заполнен. Вернитесь на экран результата → «Икигай-лист» — и он войдёт в этот отчёт.</div>`}
+  </div>
+  ${interp}
+  ${UNLOCKED?extInterp:`
+  <div class="card" style="position:relative">
+    <h2>Расширенная интерпретация</h2>
+    <div class="locked-box">${extInterp}</div>
+    <div class="locked-overlay">
+      <b>Расшифровка вашего сочетания типов, слепые зоны и план на 12 месяцев</b>
+      <div class="muted">290 ₽ — разово, доступ навсегда. Отчёт остаётся в вашем браузере.</div>
+      <div class="code-row">
+        <div><label>Код разблокировки (приходит после оплаты)</label><input type="text" id="unlock-code" placeholder="XXXX-XXXX-XXXX" style="width:260px"></div>
+        <button class="act" onclick="unlockCheck()">Разблокировать</button>
+      </div>
+      <div id="unlock-msg" class="pay-note"></div>
+      <button class="act" onclick="payClick()">Оплатить 290 ₽</button>
+    </div>
+  </div>`}
+  <div class="card"><h2>Как читать этот отчёт — и границы методики</h2>
+    <ul>
+      <li><b>Гипотезы, не вердикты.</b> Результат — «направления для исследования». Решение — после 2–3 реальных проб.</li>
+      <li><b>Живой консультант.</b> Особенно при выгорании и спешке: самотестирование в этих состояниях искажено.</li>
+      <li><b>Пересмотр.</b> Карта актуальна 1–2 года; у подростков интересы закономерно меняются.</li>
+      <li><b>Научная база (честно):</b> сейчас — открытая типология Голланда (RIASEC) + икигай-рамка. Методики МГУ-экосистемы (ЦТР «Гуманитарные технологии») — лицензионные; глубокая диагностика по ним — через партнёра-психолога (сертификация «Школа профконсультанта»). Инструмент НЕ измеряет способности, характер и «пригодность».</li>
+    </ul>
+  </div>
+  <div class="no-print" style="margin:12px 0">
+    <button class="act" onclick="window.print()">💾 Скачать PDF (через «Печать → Сохранить как PDF»)</button>
+    <button class="act sec" onclick="backToResult()">← К результату</button>
+  </div>`;
+  window.scrollTo(0,0);
+};
+window.backToResult=function(){$('#view-report').classList.remove('active');$('#view-result').classList.add('active');window.scrollTo(0,0);};
 </script>
 </body>
 </html>
