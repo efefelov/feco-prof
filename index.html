@@ -348,6 +348,19 @@ window.showResult=function(){
     <div class="callout warn">У вас нет выраженных склонностей по этой карте. Это часто значит: интересы в поиске, или вы отвечали «отчасти», или хочется сразу многого. Не спешите с выводами: попробуйте 3–4 самых разных проб (спорт-секция/мастер-класс/волонтёрство/курс) за месяц и перепройдите тест. Если поиск затягивается — разбор с консультантом сэкономит годы.</div>
   </div>`}
   <div class="card">
+    <h3>🔎 Триангуляция — сверьте карту с другими бесплатными тестами</h3>
+    <div class="muted">Один тест — слабый сигнал. Когда 2–3 независимых теста показывают одно и то же — это устойчивый интерес. Впишите результаты других <b>открытых</b> тестов, если проходили, — посчитаем совпадения. Не проходили? ДДО Климова — 20 вопросов, есть бесплатно онлайн.</div>
+    <div style="margin-top:8px">
+      <b>ДДО Климова</b> <span class="muted">(отметьте 1–2 типа, которые вам подошли)</span>
+      <div class="answers">${KLIM_TYPES.map((t,i)=>`<button class="${TRI.klim.includes(i)?'sel':''}" onclick="triSet('klim',${i},!TRI.klim.includes(${i}))">${t[0]}</button>`).join('')}</div>
+    </div>
+    <div style="margin-top:8px">
+      <b>Другой тест Голланда (RIASEC)</b> <span class="muted">(если проходили — отметьте свои сильные буквы)</span>
+      <div class="answers">${Object.keys(RIASEC_SHORT).map(l=>`<button class="${TRI.riasec.includes(l)?'sel':''}" onclick="triSet('riasec','${l}',!TRI.riasec.includes('${l}'))">${l} — ${RIASEC_SHORT[l]}</button>`).join('')}</div>
+    </div>
+    <div id="tri-out">${(TRI.klim.length||TRI.riasec.length)?triHTML(computeScores()):''}</div>
+  </div>
+  <div class="card">
     <h3>🛡️ Как мы снижаем риск неверной интерпретации</h3>
     <ul>
       <li><b>Гипотезы, не вердикты.</b> Результат сформулирован как «направления для исследования», не «тебе быть X». Профессия — ваше решение, проверенное опытом.</li>
@@ -376,6 +389,52 @@ window.showResult=function(){
 let IK={love:['','',''],good:['','',''],world:['','',''],paid:['','',''],cands:[],formula:''};
 try{const raw=localStorage.getItem('prof-ikigai');if(raw)IK=Object.assign(IK,JSON.parse(raw));}catch(e){}
 function saveIK(){try{localStorage.setItem('prof-ikigai',JSON.stringify(IK));}catch(e){}}
+
+/* ====== ТРИАНГУЛЯЦИЯ: сверка карты с другими открытыми тестами ======
+   Идея от пользователя: ценность = СОВПАДЕНИЕ нескольких независимых тестов.
+   Источники: ДДО Климова (открытый) + любой другой RIASEC-тест. Гипотезы,
+   не вердикты: совпадение = устойчивость интереса, расхождение = материал для разговора. */
+let TRI={klim:[],riasec:[]};
+try{const raw=localStorage.getItem('prof-triang');if(raw)TRI=Object.assign(TRI,JSON.parse(raw));}catch(e){}
+function saveTri(){try{localStorage.setItem('prof-triang',JSON.stringify(TRI));}catch(e){}}
+const KLIM_TYPES=[['Человек–природа',['R','I']],['Человек–техника',['R']],['Человек–человек',['S','E']],['Человек–знаковая система',['C','I']],['Человек–художественный образ',['A']]];
+const RIASEC_SHORT={R:'Практичный',I:'Исследователь',A:'Творческий',S:'Социальный',E:'Лидер',C:'Организатор'};
+function triVotes(){
+  const filled=TRI.klim.length>0||TRI.riasec.length>0;
+  const votes={R:0,I:0,A:0,S:0,E:0,C:0};
+  TRI.klim.forEach(i=>(KLIM_TYPES[i]||[null,[]])[1].forEach(l=>votes[l]++));
+  TRI.riasec.forEach(l=>{if(votes[l]!==undefined)votes[l]++;});
+  return {votes,filled};
+}
+window.triSet=function(kind,i,val){
+  const arr=TRI[kind];
+  TRI[kind]=val?(arr.includes(i)?arr:[...arr,i]):arr.filter(x=>x!==i);
+  saveTri();
+  $('#tri-out').innerHTML=(TRI.klim.length||TRI.riasec.length)?triHTML(computeScores()):'';
+};
+function triHTML(scores){
+  const {votes,filled}=triVotes();
+  if(!filled)return '';
+  const chips=[
+    ...TRI.klim.map(i=>`<span class="tag">Климов: ${KLIM_TYPES[i][0]}</span>`),
+    ...TRI.riasec.map(l=>`<span class="tag">RIASEC: ${l} — ${RIASEC_SHORT[l]}</span>`)
+  ].join(' ');
+  const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top3=sorted.slice(0,3).filter(([k,v])=>v>=4);
+  const lines=[];
+  top3.forEach(([k])=>{
+    const n=1+votes[k], name=SCALES[k].name.split(' (')[0];
+    if(n>=3)lines.push(`<div class="callout green"><b>«${name}» — согласны ${n} источника</b> (Профпроба + другие тесты). Устойчивый интерес: сюда идут первые пробы.</div>`);
+    else if(n===2)lines.push(`<div class="callout"><b>«${name}» — подтверждено двумя инструментами.</b> Крепкая гипотеза для проверки.</div>`);
+    else lines.push(`<div class="callout warn"><b>«${name}» — пока только Профпроба.</b> Слабый сигнал: проверяйте самой мелкой и дешёвой пробой.</div>`);
+  });
+  Object.keys(votes).filter(k=>votes[k]>0&&!top3.some(([k2])=>k2===k)).forEach(k=>{
+    lines.push(`<div class="callout warn"><b>Вне карты: «${SCALES[k].name.split(' (')[0]}» показали другие тесты.</b> Расхождение — не ошибка, а материал: сделайте пробу или обсудите с консультантом.</div>`);
+  });
+  if(!top3.length&&!lines.length)lines.push(`<div class="callout warn">Выраженных склонностей нет — триангуляция подождёт: сначала пробы, потом перепройдите тесты.</div>`);
+  return `${chips?`<div class="hint" style="margin:6px 0">Источники: ${chips}</div>`:''}${lines.join('')}
+  <div class="muted" style="margin-top:6px">Совпадение тестов показывает устойчивость интереса, но не заменяет пробы руками и не измеряет способности.</div>`;
+}
 window.openIkigai=function(){
   const scores=computeScores();
   const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
@@ -489,7 +548,7 @@ window.ikFormulaSave=function(v){IK.formula=v;saveIK();};
 let UNLOCKED=false;
 try{UNLOCKED=localStorage.getItem('prof-unlocked')==='1';}catch(e){}
 const PAY_LINK='#'; // ← сюда подставить ссылку на оплату (Продамус/Бусти/Т-Банк), v2
-const CODES=['PROF-490-DEMO','FECO-PROF-290'];
+const CODES=['PROF-490-DEMO','FECO-PROF-290','FECO-FIRST-390'];
 window.payClick=function(){
   const msg=document.getElementById('unlock-msg');
   if(PAY_LINK==='#'){
@@ -572,6 +631,7 @@ window.openReport=function(force){
       ${IK.formula?`<div class="callout gold"><b>Формула икигая (гипотеза на 3–6 месяцев):</b> ${IK.formula}</div>`:''}
     `:`<div class="callout warn">Икигай-лист ещё не заполнен. Вернитесь на экран результата → «Икигай-лист» — и он войдёт в этот отчёт.</div>`}
   </div>
+  ${triHTML(scores)?`<div class="card"><h2>Триангуляция — сверка с другими тестами</h2>${triHTML(scores)}</div>`:''}
   ${interp}
   ${UNLOCKED?extInterp:`
   <div class="card" style="position:relative">
@@ -579,14 +639,14 @@ window.openReport=function(force){
     <div class="locked-box">${extInterp}</div>
     <div class="locked-overlay">
       <b>Расшифровка вашего сочетания типов, слепые зоны и план на 12 месяцев</b>
-      <div class="muted">290 ₽ — разово, доступ навсегда. Отчёт остаётся в вашем браузере.</div>
+      <div class="muted">890 ₽ — разово, доступ навсегда. <b>Первым платящим — 390 ₽</b> (код разблокировки приходит после оплаты). Отчёт остаётся в вашем браузере.</div>
       <div class="muted" style="font-size:12px">Почему не бесплатно: сам тест — открытая методика, и базовый путь у нас бесплатный всегда. Платёж — только за готовый разбор (сочетание типов, слепые зоны, план на год) — то, что на рынке делают консультанты в живом разборе за 6 500 ₽+.</div>
       <div class="code-row">
         <div><label>Код разблокировки (приходит после оплаты)</label><input type="text" id="unlock-code" placeholder="XXXX-XXXX-XXXX" style="width:260px"></div>
         <button class="act" onclick="unlockCheck()">Разблокировать</button>
       </div>
       <div id="unlock-msg" class="pay-note"></div>
-      <button class="act" onclick="payClick()">Оплатить 290 ₽</button>
+      <button class="act" onclick="payClick()">Оплатить 890 ₽ · первые платящие — 390 ₽</button>
     </div>
     <div class="print-only" style="font-size:12px;color:#555;border-top:1px dashed #bbb;padding-top:6px">Расширенная интерпретация — сочетание типов, слепые зоны и план на 12 месяцев — доступна в полной версии отчёта. Базовая часть отчёта бесплатна.</div>
   </div>`}
