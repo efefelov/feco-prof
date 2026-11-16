@@ -564,16 +564,26 @@ let UNLOCKED=false;
 try{UNLOCKED=localStorage.getItem('prof-unlocked')==='1';}catch(e){}
 const PAY_LINK='#'; // ← сюда подставить ссылку на оплату (Продамус/Бусти/Т-Банк), v2
 const CODES=['PROF-490-DEMO','FECO-PROF-290','FECO-FIRST-390'];
+/* Коды бота «Азимут» (выдаются в TG после оплаты Stars): формат AZ-XXXXXXXC, контрольная сумма.
+   Алфавит без I,O,0,1 — совпадает с воркером бота. */
+const AZ_ALPHABET='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function azCodeValid(c){
+  const m=c.match(/^AZ-([A-Z0-9]{7})([A-Z0-9])$/);
+  if(!m)return false;
+  let sum=0;
+  for(const ch of m[1]){const i=AZ_ALPHABET.indexOf(ch);if(i<0)return false;sum+=i+1;}
+  return AZ_ALPHABET[sum%31]===m[2];
+}
 window.payClick=function(){
   const msg=document.getElementById('unlock-msg');
   if(PAY_LINK==='#'){
-    if(msg)msg.innerHTML='<span style="color:var(--yellow)">Оплата подключается на следующем шаге. Для теста используйте код PROF-490-DEMO</span>';
+    if(msg)msg.innerHTML='<span style="color:var(--yellow)">Карта платит картой — доступно в TG-боте @azimutprof_bot (Stars) или через ссылку оплаты, когда подключим. Для теста используйте код PROF-490-DEMO</span>';
   }else{window.open(PAY_LINK,'_blank');}
 };
 window.unlockCheck=function(){
   const c=(document.getElementById('unlock-code').value||'').trim().toUpperCase();
   const msg=document.getElementById('unlock-msg');
-  if(CODES.includes(c)){
+  if(CODES.includes(c)||azCodeValid(c)){
     UNLOCKED=true;localStorage.setItem('prof-unlocked','1');
     if(msg)msg.innerHTML='<span style="color:var(--green)">✓ Разблокировано — расширенная интерпретация добавлена в отчёт.</span>';
     openReport();
@@ -655,7 +665,7 @@ window.openReport=function(force){
     <div class="locked-overlay">
       <b>Расшифровка вашего сочетания типов, слепые зоны и план на 12 месяцев</b>
       <div class="muted">890 ₽ — разово, доступ навсегда. <b>Первым платящим — 390 ₽</b> (код разблокировки приходит после оплаты). Отчёт остаётся в вашем браузере.</div>
-      <div class="muted" style="font-size:12px">Почему не бесплатно: сам тест — открытая методика, и базовый путь у нас бесплатный всегда. Платёж — только за готовый разбор (сочетание типов, слепые зоны, план на год) — то, что на рынке делают консультанты в живом разборе за 6 500 ₽+.</div>
+      <div class="muted" style="font-size:12px">Почему не бесплатно: сам тест — открытая методика, и базовый путь у нас бесплатный всегда. Платёж — только за готовый разбор (сочетание типов, слепые зоны, план на год) — то, что на рынке делают консультанты в живом разборе за 6 500 ₽+. В Telegram: бот <b>@azimutprof_bot</b> — оплата Stars, код придёт в чат.</div>
       <div class="code-row">
         <div><label>Код разблокировки (приходит после оплаты)</label><input type="text" id="unlock-code" placeholder="XXXX-XXXX-XXXX" style="width:260px"></div>
         <button class="act" onclick="unlockCheck()">Разблокировать</button>
