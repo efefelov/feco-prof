@@ -349,10 +349,18 @@ window.showResult=function(){
   </div>`}
   <div class="card">
     <h3>🔎 Триангуляция — сверьте карту с другими бесплатными тестами</h3>
-    <div class="muted">Один тест — слабый сигнал. Когда 2–3 независимых теста показывают одно и то же — это устойчивый интерес. Впишите результаты других <b>открытых</b> тестов, если проходили, — посчитаем совпадения. Не проходили? ДДО Климова — 20 вопросов, есть бесплатно онлайн.</div>
+    <div class="muted">Один тест — слабый сигнал. Когда 2–3 независимых теста показывают одно и то же — это устойчивый интерес. Впишите результаты других <b>открытых</b> типологий, если проходили (или пройдите бесплатно — все есть онлайн), — посчитаем совпадения. Маппинг на нашу карту приближённый: это гипотезы, не математика.</div>
     <div style="margin-top:8px">
-      <b>ДДО Климова</b> <span class="muted">(отметьте 1–2 типа, которые вам подошли)</span>
+      <b>ДДО Климова</b> <span class="muted">(20 вопросов, «всё о профессиях»)</span>
       <div class="answers">${KLIM_TYPES.map((t,i)=>`<button class="${TRI.klim.includes(i)?'sel':''}" onclick="triSet('klim',${i},!TRI.klim.includes(${i}))">${t[0]}</button>`).join('')}</div>
+    </div>
+    <div style="margin-top:8px">
+      <b>DISC</b> <span class="muted">(4 типа поведения, много бесплатных версий)</span>
+      <div class="answers">${DISC_TYPES.map((t,i)=>`<button class="${TRI.disc.includes(i)?'sel':''}" onclick="triSet('disc',${i},!TRI.disc.includes(${i}))">${t[0]}</button>`).join('')}</div>
+    </div>
+    <div style="margin-top:8px">
+      <b>PAEI Адизеса</b> <span class="muted">(4 управленческие роли)</span>
+      <div class="answers">${PAEI_ROLES.map((t,i)=>`<button class="${TRI.paei.includes(i)?'sel':''}" onclick="triSet('paei',${i},!TRI.paei.includes(${i}))">${t[0]}</button>`).join('')}</div>
     </div>
     <div style="margin-top:8px">
       <b>Другой тест Голланда (RIASEC)</b> <span class="muted">(если проходили — отметьте свои сильные буквы)</span>
@@ -394,15 +402,20 @@ function saveIK(){try{localStorage.setItem('prof-ikigai',JSON.stringify(IK));}ca
    Идея от пользователя: ценность = СОВПАДЕНИЕ нескольких независимых тестов.
    Источники: ДДО Климова (открытый) + любой другой RIASEC-тест. Гипотезы,
    не вердикты: совпадение = устойчивость интереса, расхождение = материал для разговора. */
-let TRI={klim:[],riasec:[]};
+let TRI={klim:[],riasec:[],disc:[],paei:[]};
 try{const raw=localStorage.getItem('prof-triang');if(raw)TRI=Object.assign(TRI,JSON.parse(raw));}catch(e){}
 function saveTri(){try{localStorage.setItem('prof-triang',JSON.stringify(TRI));}catch(e){}}
 const KLIM_TYPES=[['Человек–природа',['R','I']],['Человек–техника',['R']],['Человек–человек',['S','E']],['Человек–знаковая система',['C','I']],['Человек–художественный образ',['A']]];
+const DISC_TYPES=[['D — доминирование: решительность, вызов',['E']],['I — влияние: убеждение, энергия',['E','S']],['S — постоянство: поддержка, надёжность',['S']],['C — соответствие: точность, качество',['C','I']]];
+const PAEI_ROLES=[['P — производитель: делать результат',['R']],['A — администратор: порядок и процессы',['C']],['E — предприниматель: рост и новое',['E']],['I — интегратор: команда и люди',['S']]];
 const RIASEC_SHORT={R:'Практичный',I:'Исследователь',A:'Творческий',S:'Социальный',E:'Лидер',C:'Организатор'};
 function triVotes(){
-  const filled=TRI.klim.length>0||TRI.riasec.length>0;
+  const filled=TRI.klim.length>0||TRI.riasec.length>0||TRI.disc.length>0||TRI.paei.length>0;
   const votes={R:0,I:0,A:0,S:0,E:0,C:0};
-  TRI.klim.forEach(i=>(KLIM_TYPES[i]||[null,[]])[1].forEach(l=>votes[l]++));
+  const add=typeArr=>idx=>(typeArr[idx]||[null,[]])[1].forEach(l=>votes[l]++);
+  TRI.klim.forEach(add(KLIM_TYPES));
+  TRI.disc.forEach(add(DISC_TYPES));
+  TRI.paei.forEach(add(PAEI_ROLES));
   TRI.riasec.forEach(l=>{if(votes[l]!==undefined)votes[l]++;});
   return {votes,filled};
 }
@@ -417,6 +430,8 @@ function triHTML(scores){
   if(!filled)return '';
   const chips=[
     ...TRI.klim.map(i=>`<span class="tag">Климов: ${KLIM_TYPES[i][0]}</span>`),
+    ...TRI.disc.map(i=>`<span class="tag">DISC: ${DISC_TYPES[i][0].split(':')[0]}</span>`),
+    ...TRI.paei.map(i=>`<span class="tag">PAEI: ${PAEI_ROLES[i][0].split(':')[0]}</span>`),
     ...TRI.riasec.map(l=>`<span class="tag">RIASEC: ${l} — ${RIASEC_SHORT[l]}</span>`)
   ].join(' ');
   const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
@@ -424,7 +439,7 @@ function triHTML(scores){
   const lines=[];
   top3.forEach(([k])=>{
     const n=1+votes[k], name=SCALES[k].name.split(' (')[0];
-    if(n>=3)lines.push(`<div class="callout green"><b>«${name}» — согласны ${n} источника</b> (Профпроба + другие тесты). Устойчивый интерес: сюда идут первые пробы.</div>`);
+    if(n>=3)lines.push(`<div class="callout green"><b>«${name}» — согласны ${n} ${n>=5?'источников':'источника'}</b> (Профпроба + другие тесты). Устойчивый интерес: сюда идут первые пробы.</div>`);
     else if(n===2)lines.push(`<div class="callout"><b>«${name}» — подтверждено двумя инструментами.</b> Крепкая гипотеза для проверки.</div>`);
     else lines.push(`<div class="callout warn"><b>«${name}» — пока только Профпроба.</b> Слабый сигнал: проверяйте самой мелкой и дешёвой пробой.</div>`);
   });
